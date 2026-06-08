@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lecteur Grammatical</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:wght@300;400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --text: #1a1916;
+    --text-muted: #8a897f;
+    --accent: #d4570a;
+    --accent-light: #fff3ec;
+    --border: #e8e6df;
+    --panel-bg: #1a1916;
+    --panel-text: #f5f4f0;
+    --highlight: #fde9d8;
+    --word-hover: #f0ede4;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+
+  .logo {
+    font-family: 'Instrument Serif', serif;
+    font-size: 1.3rem;
+    letter-spacing: -0.01em;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logo-dot { color: var(--accent); }
+
+  .header-hint {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    font-weight: 300;
+    letter-spacing: 0.02em;
+  }
+
+  /* MAIN LAYOUT */
+  main {
+    display: flex;
+    flex: 1;
+    height: calc(100vh - 57px);
+  }
+
+  /* LEFT PANEL - Camera + Text */
+  .left-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 28px 32px;
+    gap: 20px;
+    overflow-y: auto;
+  }
+
+  /* CAMERA SECTION */
+  .camera-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .camera-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .camera-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .camera-actions { display: flex; gap: 8px; }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 7px;
+    font-size: 0.8rem;
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 500;
+    cursor: pointer;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    transition: all 0.15s;
+  }
+
+  .btn:hover { background: var(--word-hover); }
+
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+    border-color: var(--accent);
+  }
+
+  .btn-primary:hover { background: #b84a08; border-color: #b84a08; }
+
+  .btn-sm { padding: 5px 10px; font-size: 0.72rem; }
+
+  .camera-body { position: relative; }
+
+  #videoEl {
+    width: 100%;
+    max-height: 220px;
+    object-fit: cover;
+    display: block;
+    background: #111;
+  }
+
+  #canvasEl { display: none; }
+
+  .camera-placeholder {
+    width: 100%;
+    height: 180px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    background: #f9f8f5;
+  }
+
+  .camera-placeholder svg { opacity: 0.3; }
+
+  .capture-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #ccc;
+    display: inline-block;
+    margin-right: 6px;
+  }
+
+  .status-dot.live { background: #22c55e; box-shadow: 0 0 0 2px #dcfce7; animation: pulse 1.5s infinite; }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 2px #dcfce7; }
+    50% { box-shadow: 0 0 0 4px #bbf7d0; }
+  }
+
+  .status-text { font-size: 0.75rem; color: var(--text-muted); }
+
+  /* TEXT DISPLAY */
+  .text-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 220px;
+  }
+
+  .text-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .text-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .text-body {
+    padding: 20px;
+    flex: 1;
+    line-height: 2;
+    font-size: 1rem;
+    font-family: 'Instrument Serif', serif;
+    color: var(--text);
+  }
+
+  .text-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 120px;
+    gap: 8px;
+    color: var(--text-muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    font-style: italic;
+  }
+
+  .word-token {
+    display: inline-block;
+    cursor: pointer;
+    border-radius: 4px;
+    padding: 1px 3px;
+    margin: 1px;
+    transition: background 0.12s, color 0.12s;
+    position: relative;
+  }
+
+  .word-token:hover {
+    background: var(--highlight);
+    color: var(--accent);
+  }
+
+  .word-token.active {
+    background: var(--accent);
+    color: white;
+  }
+
+  /* Manual text input */
+  .manual-input-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .manual-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+  }
+
+  .manual-label {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .collapse-icon { transition: transform 0.2s; color: var(--text-muted); }
+  .collapse-icon.open { transform: rotate(180deg); }
+
+  .manual-body { padding: 16px 20px; display: none; }
+  .manual-body.visible { display: flex; flex-direction: column; gap: 10px; }
+
+  textarea {
+    width: 100%;
+    min-height: 100px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-family: 'Instrument Serif', serif;
+    font-size: 0.95rem;
+    color: var(--text);
+    background: var(--bg);
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  textarea:focus { border-color: var(--accent); }
+
+  /* RIGHT PANEL - Insight */
+  .right-panel {
+    width: 360px;
+    border-left: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+  }
+
+  .insight-header {
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .insight-title {
+    font-family: 'Instrument Serif', serif;
+    font-size: 1.1rem;
+    color: var(--text);
+    margin-bottom: 2px;
+  }
+
+  .insight-subtitle {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .insight-body {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .insight-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 12px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    line-height: 1.6;
+  }
+
+  .insight-empty-icon {
+    width: 48px; height: 48px;
+    border: 1px dashed var(--border);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    margin-bottom: 4px;
+  }
+
+  /* Word chip in insight */
+  .word-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--panel-bg);
+    color: var(--panel-text);
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-family: 'Instrument Serif', serif;
+    font-size: 1rem;
+    margin-bottom: 18px;
+    align-self: flex-start;
+  }
+
+  .word-chip-context {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    margin-bottom: 18px;
+    font-style: italic;
+    line-height: 1.5;
+  }
+
+  /* Rule cards */
+  .rule-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    animation: slideIn 0.2s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .rule-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 11px 14px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .rule-tag {
+    font-size: 0.65rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: var(--accent-light);
+    color: var(--accent);
+  }
+
+  .rule-name {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .rule-body {
+    padding: 12px 14px;
+    font-size: 0.83rem;
+    color: var(--text);
+    line-height: 1.65;
+  }
+
+  .rule-example {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: var(--bg);
+    border-radius: 6px;
+    font-family: 'Instrument Serif', serif;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .rule-example strong {
+    color: var(--accent);
+    font-style: normal;
+  }
+
+  /* Loading */
+  .loading-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    height: 100%;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+
+  .spinner {
+    width: 28px; height: 28px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Processing overlay */
+  .ocr-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(26,25,22,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.85rem;
+    gap: 10px;
+    backdrop-filter: blur(2px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+
+  .ocr-overlay.visible { opacity: 1; pointer-events: all; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: var(--panel-bg);
+    color: var(--panel-text);
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    opacity: 0;
+    transition: all 0.25s;
+    z-index: 999;
+    pointer-events: none;
+  }
+
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 768px) {
+    main { flex-direction: column; height: auto; }
+    .right-panel { width: 100%; border-left: none; border-top: 1px solid var(--border); min-height: 300px; }
+    header { padding: 14px 20px; }
+    .left-panel { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    Lecteur<span class="logo-dot">.</span>fr
+  </div>
+  <span class="header-hint">Cliquez sur un mot pour analyser sa grammaire</span>
+</header>
+
+<main>
+  <!-- LEFT -->
+  <div class="left-panel">
+
+    <!-- Camera -->
+    <div class="camera-section">
+      <div class="camera-header">
+        <span class="camera-label">Caméra</span>
+        <div class="camera-actions">
+          <button class="btn btn-sm" id="btnStartCam">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+            Activer
+          </button>
+          <button class="btn btn-sm btn-primary" id="btnCapture" style="display:none">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+            Capturer & Lire
+          </button>
+        </div>
+      </div>
+      <div class="camera-body">
+        <div class="camera-placeholder" id="camPlaceholder">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <span>Activez la caméra pour photographier un texte</span>
+        </div>
+        <video id="videoEl" autoplay playsinline style="display:none"></video>
+        <canvas id="canvasEl"></canvas>
+        <div class="ocr-overlay" id="ocrOverlay">
+          <div class="spinner"></div>
+          Lecture en cours…
+        </div>
+      </div>
+      <div class="capture-bar">
+        <span><span class="status-dot" id="statusDot"></span><span class="status-text" id="statusText">Caméra inactive</span></span>
+      </div>
+    </div>
+
+    <!-- Text display -->
+    <div class="text-section">
+      <div class="text-header">
+        <span class="text-label">Texte reconnu</span>
+        <button class="btn btn-sm" id="btnClear" style="display:none">Effacer</button>
+      </div>
+      <div class="text-body" id="textBody">
+        <div class="text-empty">
+          <span>Le texte capturé apparaîtra ici</span>
+          <span style="font-size:0.75rem">Utilisez la caméra ou saisissez du texte ci-dessous</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manual input (collapsible) -->
+    <div class="manual-input-section">
+      <div class="manual-header" id="manualToggle">
+        <span class="manual-label">Saisir du texte manuellement</span>
+        <svg class="collapse-icon" id="collapseIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="manual-body" id="manualBody">
+        <textarea id="manualText" placeholder="Collez ou tapez un texte en français ici…"></textarea>
+        <button class="btn btn-primary" id="btnManual" style="align-self: flex-end;">
+          Analyser ce texte →
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: Insight panel -->
+  <div class="right-panel">
+    <div class="insight-header">
+      <div class="insight-title">Analyse grammaticale</div>
+      <div class="insight-subtitle">Cliquez sur n'importe quel mot</div>
+    </div>
+    <div class="insight-body" id="insightBody">
+      <div class="insight-empty">
+        <div class="insight-empty-icon">✦</div>
+        <strong style="color: var(--text); font-size: 0.9rem;">Choisissez un mot</strong>
+        <span>Cliquez sur un mot dans le texte pour voir les règles grammaticales qui s'y appliquent dans son contexte.</span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── State ─────────────────────────────────────────────────────────────────
+let stream = null;
+let currentText = "";
+let activeWord = null;
+let isAnalyzing = false;
+let manualOpen = false;
+
+// ─── Elements ──────────────────────────────────────────────────────────────
+const videoEl = document.getElementById('videoEl');
+const canvasEl = document.getElementById('canvasEl');
+const camPlaceholder = document.getElementById('camPlaceholder');
+const btnStartCam = document.getElementById('btnStartCam');
+const btnCapture = document.getElementById('btnCapture');
+const btnClear = document.getElementById('btnClear');
+const btnManual = document.getElementById('btnManual');
+const manualToggle = document.getElementById('manualToggle');
+const manualBody = document.getElementById('manualBody');
+const collapseIcon = document.getElementById('collapseIcon');
+const statusDot = document.getElementById('statusDot');
+const statusText = document.getElementById('statusText');
+const textBody = document.getElementById('textBody');
+const insightBody = document.getElementById('insightBody');
+const ocrOverlay = document.getElementById('ocrOverlay');
+const toast = document.getElementById('toast');
+
+// ─── Camera ────────────────────────────────────────────────────────────────
+btnStartCam.addEventListener('click', async () => {
+  if (stream) {
+    stopCamera();
+    return;
+  }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
+    videoEl.srcObject = stream;
+    videoEl.style.display = 'block';
+    camPlaceholder.style.display = 'none';
+    btnStartCam.textContent = 'Arrêter';
+    btnCapture.style.display = 'flex';
+    statusDot.classList.add('live');
+    statusText.textContent = 'Caméra active';
+  } catch (e) {
+    showToast("Impossible d'accéder à la caméra");
+  }
+});
+
+function stopCamera() {
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  videoEl.style.display = 'none';
+  camPlaceholder.style.display = 'flex';
+  btnStartCam.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>Activer`;
+  btnCapture.style.display = 'none';
+  statusDot.classList.remove('live');
+  statusText.textContent = 'Caméra inactive';
+}
+
+btnCapture.addEventListener('click', captureAndOCR);
+
+async function captureAndOCR() {
+  if (!stream) return;
+  canvasEl.width = videoEl.videoWidth;
+  canvasEl.height = videoEl.videoHeight;
+  canvasEl.getContext('2d').drawImage(videoEl, 0, 0);
+  const dataUrl = canvasEl.toDataURL('image/jpeg', 0.92);
+  ocrOverlay.classList.add('visible');
+
+  try {
+    const text = await runOCRWithClaude(dataUrl);
+    if (text) { setTextContent(text); ocrOverlay.classList.remove('visible'); showToast("Texte reconnu !"); }
+    else { ocrOverlay.classList.remove('visible'); showToast("Aucun texte détecté"); }
+  } catch (e) {
+    ocrOverlay.classList.remove('visible');
+    showToast("Erreur lors de la lecture : " + (e.message || ''));
+  }
+}
+
+// ─── OCR via Claude API ─────────────────────────────────────────────────────
+async function runOCRWithClaude(dataUrl) {
+  const base64 = dataUrl.split(',')[1];
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      system: "Tu es un OCR expert. Retranscris exactement le texte visible dans l'image, sans aucun commentaire, sans mise en forme, juste le texte brut. Si tu vois plusieurs blocs de texte, sépare-les par des sauts de ligne.",
+      messages: [{
+        role: "user",
+        content: [
+          { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64 } },
+          { type: "text", text: "Retranscris le texte de cette image." }
+        ]
+      }]
+    })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.content?.[0]?.text?.trim() || "";
+}
+
+// ─── Manual input ──────────────────────────────────────────────────────────
+manualToggle.addEventListener('click', () => {
+  manualOpen = !manualOpen;
+  manualBody.classList.toggle('visible', manualOpen);
+  collapseIcon.classList.toggle('open', manualOpen);
+});
+
+btnManual.addEventListener('click', () => {
+  const t = document.getElementById('manualText').value.trim();
+  if (!t) { showToast("Entrez du texte d'abord"); return; }
+  setTextContent(t);
+  manualBody.classList.remove('visible');
+  collapseIcon.classList.remove('open');
+  manualOpen = false;
+});
+
+// ─── Text tokenization ─────────────────────────────────────────────────────
+function setTextContent(text) {
+  currentText = text;
+  btnClear.style.display = 'inline-flex';
+  insightBody.innerHTML = `<div class="insight-empty"><div class="insight-empty-icon">✦</div><strong style="color:var(--text);font-size:.9rem">Choisissez un mot</strong><span>Cliquez sur un mot dans le texte pour voir les règles grammaticales.</span></div>`;
+
+  // Tokenize while preserving punctuation
+  const tokens = text.split(/(\s+|(?<=[^\s])[,.;:!?»«"'""''…—–\-](?=[^\s])|(?<=[^\s])[,.;:!?»«"'""''…—–\-]$)/);
+  let html = '';
+  tokens.forEach(tok => {
+    if (!tok) return;
+    if (/^\s+$/.test(tok)) { html += tok; return; }
+    const isPunct = /^[,.;:!?»«"'""''…—–\-]+$/.test(tok);
+    if (isPunct) { html += `<span>${tok}</span>`; return; }
+    const safe = tok.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    html += `<span class="word-token" data-word="${safe}">${safe}</span>`;
+  });
+  textBody.innerHTML = `<div style="line-height:2">${html}</div>`;
+
+  // Click listeners
+  textBody.querySelectorAll('.word-token').forEach(el => {
+    el.addEventListener('click', () => analyzeWord(el, el.dataset.word));
+  });
+}
+
+btnClear.addEventListener('click', () => {
+  currentText = "";
+  textBody.innerHTML = `<div class="text-empty"><span>Le texte capturé apparaîtra ici</span><span style="font-size:.75rem">Utilisez la caméra ou saisissez du texte ci-dessous</span></div>`;
+  insightBody.innerHTML = `<div class="insight-empty"><div class="insight-empty-icon">✦</div><strong style="color:var(--text);font-size:.9rem">Choisissez un mot</strong><span>Cliquez sur un mot dans le texte pour voir les règles grammaticales qui s'y appliquent dans son contexte.</span></div>`;
+  btnClear.style.display = 'none';
+  activeWord = null;
+});
+
+// ─── Grammar analysis ──────────────────────────────────────────────────────
+async function analyzeWord(el, word) {
+  if (isAnalyzing) return;
+  isAnalyzing = true;
+
+  // Update active state
+  if (activeWord) activeWord.classList.remove('active');
+  el.classList.add('active');
+  activeWord = el;
+
+  insightBody.innerHTML = `<div class="loading-wrap"><div class="spinner"></div><span>Analyse de «&nbsp;${word}&nbsp;»…</span></div>`;
+
+  try {
+    const rules = await fetchGrammarInsight(word, currentText);
+    renderInsight(word, rules);
+  } catch (e) {
+    insightBody.innerHTML = `<div class="insight-empty"><span style="color:#e55">Erreur : ${e.message || 'Réessayez'}</span></div>`;
+  }
+  isAnalyzing = false;
+}
+
+async function fetchGrammarInsight(word, context) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1000,
+      system: `Tu es un professeur de français expert et pédagogique. 
+Quand on te donne un mot et son contexte de phrase, tu identifies les 1 à 3 règles grammaticales les plus intéressantes et pertinentes qui s'appliquent à ce mot DANS CE CONTEXTE précis.
+
+Réponds UNIQUEMENT en JSON valide, sans balises markdown, sans backticks, sans texte avant ou après.
+Format exact :
+{
+  "rules": [
+    {
+      "tag": "catégorie courte (ex: Accord, Conjugaison, Orthographe, Syntaxe, Ponctuation, Nature, Pronom...)",
+      "name": "Nom de la règle (ex: Accord participe passé avec avoir)",
+      "explanation": "Explication claire et simple en 1-2 phrases",
+      "example": "Une phrase d'exemple montrant la règle, avec le mot clé entouré de **astérisques**"
+    }
+  ]
+}
+
+Sois précis, pédagogique, et toujours ancré dans le contexte donné.`,
+      messages: [{
+        role: "user",
+        content: `Mot cliqué : "${word}"\nContexte (phrase complète) : "${context}"`
+      }]
+    })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  const raw = data.content?.[0]?.text?.trim() || '{"rules":[]}';
+  try {
+    return JSON.parse(raw.replace(/```json|```/g, '').trim()).rules || [];
+  } catch { return []; }
+}
+
+// ─── Render insight ─────────────────────────────────────────────────────────
+function renderInsight(word, rules) {
+  if (!rules.length) {
+    insightBody.innerHTML = `<div class="insight-empty"><span>Aucune règle identifiée pour ce mot dans ce contexte.</span></div>`;
+    return;
+  }
+
+  // Find sentence containing word
+  const sentences = currentText.split(/[.!?…]/);
+  const ctx = sentences.find(s => s.toLowerCase().includes(word.toLowerCase())) || currentText.slice(0, 80);
+
+  let html = `<span class="word-chip">✦ ${word}</span>`;
+  html += `<p class="word-chip-context">Contexte : « ${ctx.trim()}${ctx.trim().length < currentText.length ? '…' : ''} »</p>`;
+
+  rules.forEach(r => {
+    const exampleHtml = (r.example || '').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html += `
+    <div class="rule-card">
+      <div class="rule-card-header">
+        <span class="rule-tag">${r.tag || 'Grammaire'}</span>
+        <span class="rule-name">${r.name || ''}</span>
+      </div>
+      <div class="rule-body">
+        ${r.explanation || ''}
+        ${r.example ? `<div class="rule-example">${exampleHtml}</div>` : ''}
+      </div>
+    </div>`;
+  });
+
+  insightBody.innerHTML = html;
+}
+
+// ─── Toast ─────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
